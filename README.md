@@ -7,12 +7,12 @@
 
 ### System Designer Name
 
-[Enter your name.]
+[Alexander Dominioni]
 
 
 ### System Name
 
-[Use a default name "HackTrack" or enter the name you choose for the system.]
+[HackTrack]
 
 ### System Goal
 [Read Chapter 2 Section 2.1, then enter the well-structured goal of your agentic system]
