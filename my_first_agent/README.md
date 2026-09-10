@@ -7,16 +7,16 @@
 
 ### System Designer Name
 
-[Alexander Dominioni]
+Alexander Dominioni
 
 
 ### System Name
 
-[HackTrack]
+HackTrack
 
 ### System Goal
-[Read Chapter 2 Section 2.1, then enter the well-structured goal of your agentic system]
+HackTrack gives Cal Poly Vibe Coding Club organizers a reviewed attendance forecast before each food and swag ordering deadline, moving the day-of headcount estimate from the current registration-count method — which overstated attendance by about 60% at the last build event, where roughly 40% of registrants showed up — to a forecast within 10% of the actual check-in count, using only club registration and check-in data plus at most two opt-in confirmation messages per registrant, and without placing orders, spending club funds, or collecting personal information beyond what the registration form already gathers.
 
 ### Who Is Better Off When This Works?
 
-[In one complete sentence, identify who will be better off when the system works.]
+Cal Poly Vibe Coding Club organizers who plan and pay for hackathon food, drinks, and swag are better off, and so are participants who arrive to find enough of all three.
