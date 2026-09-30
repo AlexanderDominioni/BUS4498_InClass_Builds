@@ -1,89 +1,111 @@
-# [Exact task name] Task Specification
-
-*BUS 4498 Team Build Milestone 1. Create one copy for each L3 task. Save it in `our_team_agent/agent/task-specs/` in `BUS4498_Team_Build`. Use the task name in lowercase with hyphens between words; replace `&` with `and` and remove other punctuation.*
-
-*Keep the exact task ID and name from the workflow. Complete all six sections, including Tool Permissions and Boundaries. The reason for assigning L3 belongs only in the team worksheet. Replace prompts and remove template instructions before submitting. Tool scripts are not required.*
+# Combine statuses into adjusted forecast Task Specification
 
 ```yaml
 # BASIC INFORMATION
-task_id: "[Exact workflow task ID]"
-task_name: "[Exact workflow task name]"
-task_owner: "[Person or role accountable for this task]"
+task_id: "T5"
+task_name: "Combine statuses into adjusted forecast"
+task_owner: "CPVC event operations lead (the club officer accountable for food, drink, and swag ordering)"
 
 # Agent Inference Configuration
-Provider: [e.g., Groq, OpenAI, Claude, Google Gemini]
-Model: "[Exact supported API model ID.]"
-Role: [permitted subtasks the model supports]
-Maximum inference requests per task run: "[Whole-number limit.]"
-On inference failure or exhausted limits: Record the unresolved status and hand the case to [human role].
+Provider: Claude
+Model: "claude-sonnet-5-5"
+Role: Assess response coverage, reconcile roster records, weight confirmed responses, apply baseline show rate, compare forecast methods, estimate confidence range
+Maximum inference requests per task run: "8"
+On inference failure or exhausted limits: Record the unresolved status and hand the case to the CPVC event operations lead.
 ```
 
 ## 1. Task Goal
 
-- **Objective:** [What business result should this task produce?]
+- **Objective:** Produce a single attendance forecast for the current checkpoint, expressed as a predicted headcount with a confidence range and the counts it was derived from, so that the CPVC event operations lead can decide how much food, drink, and swag to order without relying on the raw registration count.
 
 ## 2. Inbound Inputs
 
-*Describe what the enclosing workflow must provide. Specify the structure of each input; do not invent customer, employee, or event data. Copy the Input block as needed.*
-
 ### Input 1
 
-- **Input name:** [Short name.]
-- **What it contains:** [Information the agent receives, including required fields and format.]
-- **Source:** [Task ID and name, person, or other permitted source.]
+- **Input name:** Registration roster
+- **What it contains:** One record per registrant, including a registrant identifier and a registration timestamp; the total record count is the current registration total.
+- **Source:** T1 Pull registration roster.
+
+### Input 2
+
+- **Input name:** Baseline forecast
+- **What it contains:** A predicted headcount produced by applying the historical show rate from past club events to the current registration total, together with the show rate that was used.
+- **Source:** T2 Calculate baseline forecast from historical show rate.
+
+### Input 3
+
+- **Input name:** Recorded confirmation replies
+- **What it contains:** For each registrant who replied, a status of attending, not attending, or unsure. Registrants who did not reply are absent from this input. This input is present only at the 7-day and 48-hour confirmation checkpoints and is absent at the 14-day and 12-hour checkpoints.
+- **Source:** T4 Record replies as attending, not attending, or unsure.
+
+### Input 4
+
+- **Input name:** Checkpoint identity
+- **What it contains:** Which scheduled checkpoint this run belongs to, or an indication that an organizer started the run on demand.
+- **Source:** The workflow trigger described in Section 1.2 of workflow-of-tasks.md.
 
 ## 3. Tool Permissions and Boundaries
 
-*Name each planned tool and specify its permitted use. Use verb-object names, such as `retrieve_records`, usually matching the task or permitted subtask it supports. Tool name identifies the capability; tool type identifies the proposed implementation. No scripts or working integrations are required.*
-
-### Task-Wide Limits
-
-- **Total task timeout:** [Maximum elapsed time for one task run, with units; include tool calls, retries, and waiting.]
-- **Maximum tool calls:** [Maximum total calls across all tools during one task run; retries count toward this total.]
-
-### Tool 1
-
-- **Tool name:** [Proposed verb-object name, used consistently throughout the project.]
-- **Tool type:** [For example: Python script, pretrained model, API request, database query, or language-model call.]
-- **Supports these permitted subtasks:** [Names from Section 4.]
-- **Allowed use:** [What the tool may read, create, change, or send; identify permitted data sources and destinations.]
-- **Prohibited use:** [Actions, data, or destinations outside this tool's authority.]
-- **Approval required:** [What requires approval, who provides it, and when. Write "None within the allowed use" if applicable.]
-- **Timeout per call:** [Maximum duration of a single attempt, with units.]
-- **Maximum retries per call:** [Nonnegative whole number of additional attempts after the first; 0 means no retries.]
-- **Retry conditions and failure response:** [When a retry is allowed, any waiting interval, and what happens on timeout or exhausted retries. For actions that change state, avoid duplicate actions and hand off if the outcome is uncertain.]
-
-*Copy the Tool block as needed. Tool-specific and task-wide limits both apply; stop at whichever is reached first. Naming a tool does not authorize uses outside its stated permissions.*
-
 ## 4. How the Agent Should Reason
-
-*Define permitted kinds of work rather than a fixed sequence. The agent selects its next subtask using intermediate findings and may skip, repeat, or combine permitted subtasks within Section 3's limits. Individual subtasks do not all have to be L3. Copy the Permitted Subtask block as needed.*
 
 ### Permitted Subtask 1
 
-- **Subtask name:** [Use a verb-object name.]
-- **Subtask description:** [What information does it examine and what finding or intermediate result does it produce?]
-- **Subtask boundary:** [What may and may not be done, including prerequisites and required approval?]
-- **Retry limits:** [Maximum additional attempts after the initial attempt; 0 means no retries. Repetition must also stay within Section 3's limits.]
+- **Subtask name:** Assess response coverage
+- **Subtask description:** Examines the recorded confirmation replies against the registration roster to determine what share of registrants have responded, and produces a coverage finding describing whether confirmations are numerous enough to carry weight in the forecast.
+- **Subtask boundary:** May read the roster and the confirmation replies. May not contact registrants, request additional replies, or treat a non-reply as any particular intention. Requires that a registration roster is present. If Input 3 is absent for this checkpoint, coverage is recorded as none.
+- **Retry limits:** 1
+
+### Permitted Subtask 2
+
+- **Subtask name:** Reconcile roster records
+- **Subtask description:** Examines the registration roster for duplicate registrants, incomplete records, and replies that cannot be matched to a registrant, and produces a reconciled registration count together with a list of records it could not resolve.
+- **Subtask boundary:** May exclude a record from the count and must record the reason. May not alter, merge, or delete records at the source, and may not exclude more than a small minority of records without handing off. Requires that a registration roster is present.
+- **Retry limits:** 1
+
+### Permitted Subtask 3
+
+- **Subtask name:** Weight confirmed responses
+- **Subtask description:** Examines the recorded statuses and produces a candidate forecast built primarily from registrants who confirmed attendance, applying the historical show rate only to registrants who did not reply or replied unsure.
+- **Subtask boundary:** May produce a candidate forecast only. May not treat this candidate as the final result without comparing it against the baseline, and may not invent a response for a registrant who did not reply. Requires a completed coverage assessment.
+- **Retry limits:** 1
+
+### Permitted Subtask 4
+
+- **Subtask name:** Apply baseline show rate
+- **Subtask description:** Examines the reconciled registration count and the historical show rate and produces a candidate forecast built from the baseline alone, for use when confirmation coverage is too low to be informative or when confirmations are unavailable.
+- **Subtask boundary:** May use only the show rate supplied in Input 2. May not substitute a show rate of its own, and may not adjust the rate to fit an expected answer.
+- **Retry limits:** 1
+
+### Permitted Subtask 5
+
+- **Subtask name:** Compare forecast methods
+- **Subtask description:** Examines the candidate forecasts produced so far and reports the size and direction of the difference between them, producing a finding on whether they broadly agree or contradict each other.
+- **Subtask boundary:** May report a discrepancy. May not average two contradictory candidates into a single number to conceal the disagreement, and may not select a candidate on the grounds that it is more convenient to plan around. Requires at least two candidate forecasts.
+- **Retry limits:** 0
+
+### Permitted Subtask 6
+
+- **Subtask name:** Estimate confidence range
+- **Subtask description:** Examines the selected candidate forecast together with the coverage finding and the count of unresolved records, and produces an upper and lower bound reflecting how much of the forecast rests on confirmed responses rather than on the historical rate.
+- **Subtask boundary:** May widen the range to reflect weak evidence. May not narrow the range below the spread implied by the unconfirmed portion of the roster, and may not report a forecast without a range attached.
+- **Retry limits:** 1
 
 - **Decision guidance:** After each subtask, use its findings to select the permitted subtask most likely to resolve the most important remaining uncertainty. Do not follow a fixed sequence. If no permitted subtask can make useful progress, stop and hand the case to a person.
 
 ## 5. When to Stop or Hand Off to a Human
 
-- **Stop successfully when:** [What evidence shows that the required result is complete and acceptable? Confidence alone is not enough.]
-- **Hand off early when:** [What missing evidence, lack of progress, failure, or out-of-scope finding requires human review?]
-- **Hand off to:** [Specific person, role, or review queue.]
+- **Stop successfully when:** A single forecast has been selected, a confidence range has been attached to it, and the record names the reconciled registration count, the confirmation counts by status, the show rate used, and which permitted subtasks produced the result. Every roster record is either included in the count or listed as unresolved with a reason.
+- **Hand off early when:** The registration roster is missing or unreadable; the candidate forecasts contradict each other by more than the confidence range can absorb; more than a small minority of roster records cannot be reconciled; the confidence range is too wide to support an ordering decision; the checkpoint identity cannot be determined; or the inference request limit in the Basic Information block is reached before a forecast has been selected.
+- **Hand off to:** The CPVC event operations lead.
 
 Stop at the first applicable budget limit or handoff condition. While awaiting review, take no further autonomous action.
 
 ## 6. Outbound Deliverable
 
-*Revise these default items if your task needs a more specific deliverable, or retain them if they fit.*
-
 - **Status:** Completed or escalated to human.
-- **Result or recommendation:** The completed result. If escalated before reaching a supported result, write undetermined.
-- **Evidence summary:** The most important evidence supporting the result or explaining why no result could be reached.
+- **Result or recommendation:** The selected attendance forecast with its confidence range. If escalated before a forecast could be selected, write undetermined.
+- **Evidence summary:** The reconciled registration count, the confirmation counts by status, the show rate applied, and the reason this candidate forecast was selected over the alternative.
 - **Subtasks performed:** Permitted subtasks completed, including repeated attempts.
-- **Unresolved issues:** Remaining uncertainties or questions; use none only if no unresolved issue remains.
+- **Unresolved issues:** Roster records that could not be reconciled, and any disagreement between candidate forecasts that the confidence range does not absorb; use none only if no unresolved issue remains.
 - **Handoff note:** Reason for stopping, unresolved questions, and what the reviewer needs to decide; write "Not applicable" for a completed task.
-- **Next task or recipient:** Who receives the completed output? Unresolved cases go to the handoff recipient above.
+- **Next task or recipient:** T6 Write forecast and range to planning sheet. Unresolved cases go to the CPVC event operations lead.
