@@ -1,5 +1,6 @@
-// Club Event Radar website (Stages 6 and 7).
-// Lists published events from the database and sends new announcements to the AI agent.
+// Club Event Radar website (Stages 6 to 8).
+// Lists published events from the database, sends new announcements to the AI agent,
+// and lets a signed-in moderator approve or reject waiting posts.
 // All user text is shown with textContent, never innerHTML.
 
 (function () {
@@ -20,6 +21,13 @@
   const board = document.getElementById("board");
   const refreshButton = document.getElementById("refresh");
   const chips = document.querySelectorAll(".chip");
+  const signinForm = document.getElementById("signin-form");
+  const signinButton = document.getElementById("signin-button");
+  const signinError = document.getElementById("signin-error");
+  const modPanel = document.getElementById("mod-panel");
+  const modWho = document.getElementById("mod-who");
+  const waitingBoard = document.getElementById("waiting-board");
+  const signOutButton = document.getElementById("sign-out");
 
   let events = [];
   let filter = "all";
@@ -207,6 +215,115 @@
     } finally {
       postButton.disabled = false;
       postButton.textContent = "Send to the agent";
+    }
+  });
+
+  // ---- Moderator sign-in ----
+
+  let moderator = null;
+
+  async function review(event, status, buttons) {
+    buttons.forEach((b) => { b.disabled = true; });
+    const { data, error } = await db
+      .from("events")
+      .update({
+        status,
+        status_reason: status === "published" ? "Approved by a moderator." : "Rejected by a moderator.",
+        reviewed_at: new Date().toISOString(),
+        reviewed_by: moderator.email,
+      })
+      .eq("id", event.id)
+      .select("id");
+    if (error || !data || data.length === 0) {
+      console.error(error);
+      buttons.forEach((b) => { b.disabled = false; });
+      alert("That change couldn’t be saved. Please sign in again and retry.");
+      return;
+    }
+    loadWaiting();
+    if (status === "published") loadEvents();
+  }
+
+  function renderWaitingCard(event) {
+    const li = renderCard(event);
+    const box = el("div", "review");
+    const why = [event.status_reason, event.note_for_moderator].filter(Boolean).join(" ");
+    box.append(el("p", "why", why || "Waiting for review."));
+    box.append(el("p", "original", event.announcement));
+
+    const actions = el("p", "actions");
+    const approve = el("button", null, "Approve");
+    const reject = el("button", "ghost", "Reject");
+    approve.type = "button";
+    reject.type = "button";
+    approve.addEventListener("click", () => review(event, "published", [approve, reject]));
+    reject.addEventListener("click", () => review(event, "rejected", [approve, reject]));
+    actions.append(approve, reject);
+    box.append(actions);
+
+    // Put the review box under the card's text, before the flyer.
+    li.querySelector(".event-body").append(box);
+    return li;
+  }
+
+  async function loadWaiting() {
+    const { data, error } = await db
+      .from("events")
+      .select("*")
+      .eq("status", "waiting")
+      .order("created_at", { ascending: true });
+    waitingBoard.replaceChildren();
+    if (error) {
+      console.error(error);
+      waitingBoard.append(el("li", "empty", "Waiting posts couldn’t be loaded."));
+      return;
+    }
+    if (!data.length) {
+      waitingBoard.append(el("li", "empty", "Nothing is waiting. You’re all caught up!"));
+      return;
+    }
+    data.forEach((event) => waitingBoard.append(renderWaitingCard(event)));
+  }
+
+  function showModerator(session) {
+    moderator = session ? session.user : null;
+    signinForm.hidden = !!moderator;
+    modPanel.hidden = !moderator;
+    if (moderator) {
+      modWho.textContent = "Signed in as " + moderator.email;
+      loadWaiting();
+    } else {
+      waitingBoard.replaceChildren();
+    }
+  }
+
+  signinForm.addEventListener("submit", async (submitEvent) => {
+    submitEvent.preventDefault();
+    signinError.hidden = true;
+    signinButton.disabled = true;
+    const { data, error } = await db.auth.signInWithPassword({
+      email: document.getElementById("mod-email").value.trim(),
+      password: document.getElementById("mod-password").value,
+    });
+    signinButton.disabled = false;
+    if (error) {
+      signinError.textContent = "That email and password didn’t match a moderator account.";
+      signinError.hidden = false;
+      return;
+    }
+    signinForm.reset();
+    showModerator(data.session);
+  });
+
+  signOutButton.addEventListener("click", async () => {
+    await db.auth.signOut();
+    showModerator(null);
+  });
+
+  db.auth.getSession().then(({ data }) => {
+    if (data.session) {
+      document.getElementById("mod").open = true;
+      showModerator(data.session);
     }
   });
 

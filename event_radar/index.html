@@ -55,6 +55,28 @@
   </section>
 </main>
 
+<div class="wrap">
+  <details class="card mod" id="mod">
+    <summary>Moderator sign-in</summary>
+    <form id="signin-form">
+      <label for="mod-email">Email</label>
+      <input type="email" id="mod-email" autocomplete="username" required>
+      <label for="mod-password">Password</label>
+      <input type="password" id="mod-password" autocomplete="current-password" required>
+      <button type="submit" id="signin-button">Sign in</button>
+      <p class="why" id="signin-error" hidden></p>
+    </form>
+    <div id="mod-panel" hidden>
+      <div class="board-head">
+        <h2>Waiting for review</h2>
+        <button type="button" class="ghost" id="sign-out">Sign out</button>
+      </div>
+      <p class="muted" id="mod-who"></p>
+      <ul class="board" id="waiting-board"></ul>
+    </div>
+  </details>
+</div>
+
 <footer class="wrap foot">
   <p>Club Event Radar · A BUS 4498 class project. Practice rules, not Cal Poly or ASI policy.</p>
 </footer>
