@@ -1,17 +1,20 @@
-// Club Event Radar website (Stage 6).
+// Club Event Radar website (Stages 6 and 7).
 // Lists published events from the database and sends new announcements to the AI agent.
 // All user text is shown with textContent, never innerHTML.
 
 (function () {
   const config = window.EVENT_RADAR_CONFIG || {};
   const AGENT_URL = config.supabaseUrl + "/functions/v1/submit-event";
+  const FLYER_PREFIX = config.supabaseUrl + "/storage/v1/object/public/flyers/";
+  const MAX_FLYER_BYTES = 5 * 1024 * 1024;
   const PUBLIC_COLUMNS =
-    "id, created_at, status, title, club, event_date, start_time, end_time, place_name, place_detail, cost, free_food, summary";
+    "id, created_at, status, title, club, event_date, start_time, end_time, place_name, place_detail, cost, free_food, summary, flyer_url";
 
   const db = window.supabase.createClient(config.supabaseUrl, config.publishableKey);
 
   const form = document.getElementById("post-form");
   const textarea = document.getElementById("announcement");
+  const flyerInput = document.getElementById("flyer");
   const postButton = document.getElementById("post-button");
   const result = document.getElementById("result");
   const board = document.getElementById("board");
@@ -96,6 +99,15 @@
     if (tags.childNodes.length) body.append(tags);
 
     li.append(body);
+
+    // Only show photos stored in this project's flyers bucket.
+    if (event.flyer_url && event.flyer_url.startsWith(FLYER_PREFIX)) {
+      const img = el("img", "flyer");
+      img.src = event.flyer_url;
+      img.alt = "Flyer for " + (event.title || "this event");
+      img.loading = "lazy";
+      li.append(img);
+    }
     return li;
   }
 
@@ -158,6 +170,15 @@
       showResult("error", "Please paste an announcement first.");
       return;
     }
+    const flyer = flyerInput.files[0];
+    if (flyer && !["image/jpeg", "image/png"].includes(flyer.type)) {
+      showResult("error", "The photo must be a JPG or PNG file.");
+      return;
+    }
+    if (flyer && flyer.size > MAX_FLYER_BYTES) {
+      showResult("error", "The photo is larger than 5 MB. Please choose a smaller one.");
+      return;
+    }
 
     postButton.disabled = true;
     postButton.textContent = "The agent is reading your post…";
@@ -165,6 +186,7 @@
     try {
       const body = new FormData();
       body.append("announcement", text);
+      if (flyer) body.append("flyer", flyer);
       const response = await fetch(AGENT_URL, {
         method: "POST",
         headers: { apikey: config.publishableKey },
